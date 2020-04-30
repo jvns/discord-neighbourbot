@@ -246,38 +246,24 @@ import discord
 import asyncio
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-MESSAGE_OVER_SCRIPT="""
-It’s been 5 minutes! this is your official time to end the conversation if you'd like :)!
-Press 💬 to have another chat!
-Or you can get some tea, or keep talking to the same people if you’d like!
-"""
-
 MATCH_SCRIPT="""
-<@{id1}> and <@{id2}> are neighbours! Go chat in #{channel_name}!
-"""
-
-HELP_MESSAGE = """
-Hi! I can connect you with 2 other !!Con attendees for a 5 minute chat!
-
-This is like chatting with the people in the seats next to you when you’re watching a talk :). How it works:
-
-1. Get matched!
-2. Join the voice channel I give you with your 2 neighbours!
-3. After 5 minutes, I'll send you a message and you can request another chat!
-
-Press 💬 under this message to request a chat!
+<@{id1}> and <@{id2}> are neighbours! Go chat in **#{channel_name}** {invite_link} !
 """
 
 EMOJI_ANOTHER_CHAT = '💬'
+CHECKMARK='☑️'
 
 NEIGHBOUR_CATEGORY='Chat with neighbours!'
 def random_channel_name():
     return random.choice(computer_words) + '-' + random.choice(flower_words)
 
 class MyClient(discord.Client):
+    def __init__(self):
+        self.chats_requested = dict() # maps users to the channel the message was on
+        super().__init__()
+
     async def on_ready(self):
         print(f'{self.user} has connected to Discord!')
-        self.chats_requested = dict() # maps users to the channel the message was on
         await self.find_chats()
 
     def get_neighbour_category(self):
@@ -288,22 +274,23 @@ class MyClient(discord.Client):
         category = self.get_neighbour_category()
         channel_name = random_channel_name()
         channel = await category.create_voice_channel(channel_name)
-        return channel_name
+        invite = await channel.create_invite()
+        return invite, channel_name
 
     async def find_chats(self):
         while True:
             if len(self.chats_requested) >= 2:
                 person_1, person_2 = list(self.chats_requested.keys())[:2]
                 channel_1 = self.chats_requested.pop(person_1)
-                channel_name = await self.create_and_invite_voice_channel()
-                message_1 = await channel_1.send(MATCH_SCRIPT.format(id1=person_1.id, id2=person_2.id, channel_name=channel_name))
+                invite, channel_name = await self.create_and_invite_voice_channel()
+                message_1 = await channel_1.send(MATCH_SCRIPT.format(id1=person_1.id, id2=person_2.id, channel_name=channel_name, invite_link=str(invite)))
             else:
                 print("oh no nothing yet", len(self.chats_requested))
                 # hang out for 5 seconds and try again later
                 await asyncio.sleep(5)
 
     async def request_chat(self, message):
-        await message.channel.send("Yay! I'm requesting a chat for you!")
+        await message.add_reaction(CHECKMARK)
         person = message.author
         self.chats_requested[person] = message.channel
 
@@ -322,11 +309,6 @@ class MyClient(discord.Client):
             return
         elif message.content.lower().startswith('match me'):
             await self.request_chat(message)
-        elif message.content.lower().startswith('help'):
-            sent = await message.channel.send(HELP_MESSAGE)
-            await sent.add_reaction(EMOJI_ANOTHER_CHAT)
-        else:
-            await message.channel.send("I didn't understand that! Type 'help' to get help.")
 
 if __name__ == '__main__':
     client = MyClient()
