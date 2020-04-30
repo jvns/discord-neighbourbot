@@ -253,8 +253,7 @@ Or you can get some tea, or keep talking to the same people if you’d like!
 """
 
 MATCH_SCRIPT="""
-Your neighbour is @{username}! Join voice chat #{channel_name} with them:
-⏩  {invite_link} ⏪
+<@{id1}> and <@{id2}> are neighbours! Go chat in #{channel_name}!
 """
 
 HELP_MESSAGE = """
@@ -289,24 +288,15 @@ class MyClient(discord.Client):
         category = self.get_neighbour_category()
         channel_name = random_channel_name()
         channel = await category.create_voice_channel(channel_name)
-        invite = await channel.create_invite()
-        return invite, channel_name
+        return channel_name
 
     async def find_chats(self):
         while True:
             if len(self.chats_requested) >= 2:
                 person_1, person_2 = list(self.chats_requested.keys())[:2]
                 channel_1 = self.chats_requested.pop(person_1)
-                channel_2 = self.chats_requested.pop(person_2)
-                invite, channel_name = await self.create_and_invite_voice_channel()
-                invite = str(invite)
-                message_1 = await channel_1.send(MATCH_SCRIPT.format(username=str(person_2), channel_name=channel_name, invite_link=invite))
-                message_2 = await channel_2.send(MATCH_SCRIPT.format(username=str(person_1), channel_name=channel_name, invite_link=invite))
-                await asyncio.sleep(300)
-                message = await channel_1.send(MESSAGE_OVER_SCRIPT)
-                await message.add_reaction(EMOJI_ANOTHER_CHAT)
-                message = await channel_2.send(MESSAGE_OVER_SCRIPT)
-                await message.add_reaction(EMOJI_ANOTHER_CHAT)
+                channel_name = await self.create_and_invite_voice_channel()
+                message_1 = await channel_1.send(MATCH_SCRIPT.format(id1=person_1.id, id2=person_2.id, channel_name=channel_name))
             else:
                 print("oh no nothing yet", len(self.chats_requested))
                 # hang out for 5 seconds and try again later
@@ -314,8 +304,8 @@ class MyClient(discord.Client):
 
     async def request_chat(self, message):
         await message.channel.send("Yay! I'm requesting a chat for you!")
-        person = message.channel.recipient
-        self.chats_requested[str(person)] = message.channel
+        person = message.author
+        self.chats_requested[person] = message.channel
 
     async def on_reaction_add(self, reaction, user):
         if user == self.user:
@@ -324,20 +314,17 @@ class MyClient(discord.Client):
             await self.request_chat(reaction.message)
 
     async def on_message(self, message):
-        if type(message.channel) != discord.DMChannel:
+        if message.channel.name != 'neighbourbot':
             # ignore anything that isn't a DM
             return
         elif message.author == self.user:
             # ignore messages from the bot
             return
-        elif message.content.lower().startswith('hi'):
-            sent = await message.channel.send(HELP_MESSAGE)
-            await sent.add_reaction(EMOJI_ANOTHER_CHAT)
+        elif message.content.lower().startswith('match me'):
+            await self.request_chat(message)
         elif message.content.lower().startswith('help'):
             sent = await message.channel.send(HELP_MESSAGE)
             await sent.add_reaction(EMOJI_ANOTHER_CHAT)
-        elif message.content.startswith('!5minchat'):
-            await self.request_chat(message)
         else:
             await message.channel.send("I didn't understand that! Type 'help' to get help.")
 
