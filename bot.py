@@ -1,6 +1,8 @@
 # bot.py
 import os
 import random
+import asyncio
+from datetime import datetime, timezone, timedelta
 
 # todo: maybe make it work from a channel and not just a DM?
 
@@ -250,10 +252,10 @@ MATCH_SCRIPT="""
 <@{id1}> and <@{id2}> are neighbours! Go chat in **#{channel_name}** {invite_link} !
 """
 
-EMOJI_ANOTHER_CHAT = '💬'
 CHECKMARK='☑️'
 
 NEIGHBOUR_CATEGORY='Chat with neighbours!'
+
 def random_channel_name():
     return random.choice(computer_words) + '-' + random.choice(flower_words)
 
@@ -264,7 +266,8 @@ class MyClient(discord.Client):
 
     async def on_ready(self):
         print(f'{self.user} has connected to Discord!')
-        await self.find_chats()
+        # delete old channels in the background
+        await asyncio.gather(self.find_chats(), self.delete_old_channels())
 
     def get_neighbour_category(self):
         # todo: maybe add error handling lol
@@ -276,6 +279,15 @@ class MyClient(discord.Client):
         channel = await category.create_voice_channel(channel_name)
         invite = await channel.create_invite()
         return invite, channel_name
+
+    async def delete_old_channels(self):
+        while True:
+            category = self.get_neighbour_category()
+            for channel in category.channels:
+                time_since_created = datetime.now(timezone.utc) - channel.created_at.replace(tzinfo=timezone.utc)
+                if time_since_created > timedelta(minutes=10) and len(channel.members) == 0:
+                    await channel.delete()
+            await asyncio.sleep(5)
 
     async def find_chats(self):
         while True:
@@ -293,12 +305,6 @@ class MyClient(discord.Client):
         await message.add_reaction(CHECKMARK)
         person = message.author
         self.chats_requested[person] = message.channel
-
-    async def on_reaction_add(self, reaction, user):
-        if user == self.user:
-            return
-        if reaction.emoji == EMOJI_ANOTHER_CHAT :
-            await self.request_chat(reaction.message)
 
     async def on_message(self, message):
         if message.channel.name != 'neighbourbot':
