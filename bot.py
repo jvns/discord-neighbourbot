@@ -13,6 +13,8 @@ MATCH_SCRIPT="""
 CHECKMARK = '☑️'
 NEIGHBOUR_CATEGORY='Chat with neighbours!'
 NEIGHBOUR_CHANNEL='neighbourbot'
+NEIGHBOURBOT_TOPIC="""say "**match me**" to get matched a person to chat with!
+This is like chatting with the person next to you at a conference!"""
 
 def read_words(filename):
     with open(filename) as f:
@@ -36,7 +38,10 @@ class MyClient(discord.Client):
         # that needs to be done
         while True:
             tasks = []
-            for guild_client in GUILDS.values():
+            for guild in self.guilds:
+                guild_client = self.guild_client(guild)
+                tasks.append(guild_client.get_neighbour_channel())
+                tasks.append(guild_client.get_neighbour_category())
                 tasks.append(guild_client.find_chats())
                 tasks.append(guild_client.delete_old_channels())
             asyncio.gather(*tasks)
@@ -72,27 +77,38 @@ class GuildClient(object):
         self.guild = guild
         self.chats_requested = set()
         self.neighbour_channel = None
+        self.neighbour_category = None
         print(f'Added guild {guild.name}')
 
-    def get_neighbour_channel(self):
-        # todo: maybe add error handling lol
+    async def get_neighbour_channel(self):
         if self.neighbour_channel is None:
-            self.neighbour_channel = [x for x in self.guild.channels if x.name == NEIGHBOUR_CHANNEL][0]
+            matches = [x for x in self.guild.channels if x.name == NEIGHBOUR_CHANNEL]
+            if len(matches) == 0:
+                # by default put the channel in the guild's first category
+                category = self.guild.categories[0]
+                self.neighbour_channel = await category.create_text_channel(NEIGHBOUR_CHANNEL, topic=NEIGHBOURBOT_TOPIC)
+            else:
+                self.neighbour_channel = matches[0]
         return self.neighbour_channel
 
-    def get_neighbour_category(self):
-        # todo: maybe add error handling lol
-        return [x for x in self.guild.categories if x.name == NEIGHBOUR_CATEGORY][0]
+    async def get_neighbour_category(self):
+        if self.neighbour_category is None:
+            matches = [x for x in self.guild.categories if x.name == NEIGHBOUR_CATEGORY]
+            if len(matches) == 0:
+                self.neighbour_category = await self.guild.create_category(NEIGHBOUR_CATEGORY)
+            else:
+                self.neighbour_category = matches[0]
+        return self.neighbour_category
 
     async def create_and_invite_voice_channel(self):
-        category = self.get_neighbour_category()
+        category = await self.get_neighbour_category()
         channel_name = random_channel_name()
         channel = await category.create_voice_channel(channel_name)
         invite = await channel.create_invite()
         return invite, channel_name
 
     async def delete_old_channels(self):
-        category = self.get_neighbour_category()
+        category = await self.get_neighbour_category()
         for channel in category.channels:
             time_since_created = datetime.now(timezone.utc) - channel.created_at.replace(tzinfo=timezone.utc)
             if time_since_created > timedelta(minutes=10) and len(channel.members) == 0:
@@ -105,7 +121,8 @@ class GuildClient(object):
                 self.chats_requested.remove(person)
             list_of_ids = ' and '.join([f'<@{x.id}>' for x in group])
             invite, channel_name = await self.create_and_invite_voice_channel()
-            await self.get_neighbour_channel().send(MATCH_SCRIPT.format(list_of_ids = list_of_ids, channel_name=channel_name, invite_link=str(invite)))
+            neighbour_channel = await self.get_neighbour_channel()
+            await neighbour_channel.send(MATCH_SCRIPT.format(list_of_ids = list_of_ids, channel_name=channel_name, invite_link=str(invite)))
 
     async def request_chat(self, message):
         await message.add_reaction(CHECKMARK)
