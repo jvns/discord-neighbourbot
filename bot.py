@@ -13,8 +13,8 @@ MATCH_SCRIPT="""
 CHECKMARK = '☑️'
 NEIGHBOUR_CATEGORY='Chat with neighbours!'
 NEIGHBOUR_CHANNEL='neighbourbot'
-NEIGHBOURBOT_TOPIC="""say "**match me**" to get matched a person to chat with!
-This is like chatting with the person next to you at a conference!"""
+NEIGHBOURBOT_TOPIC="""say "**match me**" to get matched with 2 other people to voice chat with.
+It's like chatting with the person next to you at a conference!"""
 
 def read_words(filename):
     with open(filename) as f:
@@ -111,7 +111,10 @@ class GuildClient(object):
 
     async def find_chats(self):
         while len(self.chats_requested) >= 2:
-            group = list(self.chats_requested)[:3]
+            if len(self.chats_requested) == 4:
+                group = list(self.chats_requested)[:2]
+            else:
+                group = list(self.chats_requested)[:3]
             for person in group:
                 self.chats_requested.remove(person)
             list_of_ids = ' and '.join([f'<@{x.id}>' for x in group])
