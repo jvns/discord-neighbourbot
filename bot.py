@@ -34,12 +34,12 @@ class MyClient(discord.Client):
     async def run_guild_tasks(self):
         # Go through every server (guild) we're connected to and do everything
         # that needs to be done
-        # TODO: this won't scale well if there are more than a few guilds.
-        # But that's fine for now
         while True:
+            tasks = []
             for guild_client in GUILDS.values():
-                await guild_client.find_chats()
-                await guild_client.delete_old_channels()
+                tasks.append(guild_client.find_chats())
+                tasks.append(guild_client.delete_old_channels())
+            asyncio.gather(*tasks)
             await asyncio.sleep(2)
 
     def guild_client(self, guild):
@@ -53,11 +53,14 @@ class MyClient(discord.Client):
         await self.run_guild_tasks()
 
     async def on_message(self, message):
-        if message.channel.name != NEIGHBOUR_CHANNEL:
-            # ignore anything that isn't a DM
-            return
-        elif message.author == self.user:
+        if message.author == self.user:
             # ignore messages from the bot
+            return
+        elif type(message.channel) == discord.DMChannel:
+            await message.channel.send("talk to me in the #neighbourbot channel instead!")
+            return
+        elif message.channel.name != NEIGHBOUR_CHANNEL:
+            # ignore anything that isn't a DM
             return
         elif message.content.lower().startswith('match me'):
             await self.guild_client(message.guild).request_chat(message)
@@ -97,7 +100,7 @@ class GuildClient(object):
 
     async def find_chats(self):
         while len(self.chats_requested) >= 2:
-            group = sorted(list(self.chats_requested)[:3])
+            group = list(self.chats_requested)[:3]
             for person in group:
                 self.chats_requested.remove(person)
             list_of_ids = ' and '.join([f'<@{x.id}>' for x in group])
