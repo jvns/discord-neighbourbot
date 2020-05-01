@@ -5,13 +5,14 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 import discord
 import asyncio
-TOKEN = os.getenv('DISCORD_TOKEN')
+from unicodedata import lookup
 
 MATCH_SCRIPT="""
-<@{id1}> and <@{id2}> are neighbours! Go chat in **#{channel_name}** {invite_link} !
+{list_of_ids} are neighbours! Go chat in **#{channel_name}** {invite_link} !
 """
-CHECKMARK='☑️'
+CHECKMARK = lookup('BALLOT BOX WITH CHECK')
 NEIGHBOUR_CATEGORY='Chat with neighbours!'
+NEIGHBOUR_CHANNEL='neighbourbot'
 
 def read_words(filename):
     with open(filename) as f:
@@ -23,19 +24,62 @@ flower_words = read_words('flowers.txt')
 def random_channel_name():
     return random.choice(computer_words) + '-' + random.choice(flower_words)
 
+# make this a global for now because we can't set attributes on the discord client
+GUILDS = dict()
+
 class MyClient(discord.Client):
     def __init__(self):
-        self.chats_requested = dict() # maps users to the channel the message was on
         super().__init__()
+
+    async def run_guild_tasks(self):
+        # Go through every server (guild) we're connected to and do everything
+        # that needs to be done
+        # TODO: this won't scale well if there are more than a few guilds.
+        # But that's fine for now
+        while True:
+            for guild_client in GUILDS.values():
+                await guild_client.find_chats()
+                await guild_client.delete_old_channels()
+            await asyncio.sleep(2)
+
+    def guild_client(self, guild):
+        if guild not in GUILDS:
+            GUILDS[guild] = GuildClient(guild)
+        return GUILDS[guild]
 
     async def on_ready(self):
         print(f'{self.user} has connected to Discord!')
         # delete old channels in the background
-        await asyncio.gather(self.find_chats(), self.delete_old_channels())
+        await self.run_guild_tasks()
+
+    async def on_message(self, message):
+        if message.channel.name != NEIGHBOUR_CHANNEL:
+            # ignore anything that isn't a DM
+            return
+        elif message.author == self.user:
+            # ignore messages from the bot
+            return
+        elif message.content.lower().startswith('match me'):
+            await self.guild_client(message.guild).request_chat(message)
+
+
+class GuildClient(object):
+    # we have one of these for each guild and it manages everything for that guild
+    def __init__(self, guild):
+        self.guild = guild
+        self.chats_requested = set()
+        self.neighbour_channel = None
+        print(f'Added guild {guild.name}')
+
+    def get_neighbour_channel(self):
+        # todo: maybe add error handling lol
+        if self.neighbour_channel is None:
+            self.neighbour_channel = [x for x in self.guild.channels if x.name == NEIGHBOUR_CHANNEL][0]
+        return self.neighbour_channel
 
     def get_neighbour_category(self):
         # todo: maybe add error handling lol
-        return [x for x in self.guilds[0].categories if x.name == NEIGHBOUR_CATEGORY][0]
+        return [x for x in self.guild.categories if x.name == NEIGHBOUR_CATEGORY][0]
 
     async def create_and_invite_voice_channel(self):
         category = self.get_neighbour_category()
@@ -54,32 +98,18 @@ class MyClient(discord.Client):
             await asyncio.sleep(5)
 
     async def find_chats(self):
-        while True:
-            if len(self.chats_requested) >= 2:
-                person_1, person_2 = list(self.chats_requested.keys())[:2]
-                channel_1 = self.chats_requested.pop(person_1)
-                invite, channel_name = await self.create_and_invite_voice_channel()
-                message_1 = await channel_1.send(MATCH_SCRIPT.format(id1=person_1.id, id2=person_2.id, channel_name=channel_name, invite_link=str(invite)))
-            else:
-                print("oh no nothing yet", len(self.chats_requested))
-                # hang out for 5 seconds and try again later
-                await asyncio.sleep(5)
+        while len(self.chats_requested) > 2:
+            group = sorted(list(self.chats_requested)[:3])
+            for person in group:
+                self.chats_requested.remove(person)
+            list_of_ids = ' and '.join([f'<@{x.id}>' for x in group])
+            invite, channel_name = await self.create_and_invite_voice_channel()
+            message_1 = await self.get_neighbour_channel().send(MATCH_SCRIPT.format(list_of_ids = list_of_ids, channel_name=channel_name, invite_link=str(invite)))
 
     async def request_chat(self, message):
         await message.add_reaction(CHECKMARK)
-        person = message.author
-        self.chats_requested[person] = message.channel
-
-    async def on_message(self, message):
-        if message.channel.name != 'neighbourbot':
-            # ignore anything that isn't a DM
-            return
-        elif message.author == self.user:
-            # ignore messages from the bot
-            return
-        elif message.content.lower().startswith('match me'):
-            await self.request_chat(message)
+        self.chats_requested.add(message.author)
 
 if __name__ == '__main__':
     client = MyClient()
-    client.run(TOKEN)
+    client.run(os.getenv('DISCORD_TOKEN'))
