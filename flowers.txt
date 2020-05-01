@@ -2,7 +2,6 @@ acacia
 acanthus
 aloe
 amaranth
-american ash
 angelica
 anthericum
 arum
@@ -127,7 +126,6 @@ vervain
 violet
 wallflower
 waterlily
-willowherb purple
 woad
 wormwood
 yew
