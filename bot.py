@@ -41,7 +41,6 @@ class MyClient(discord.Client):
             for guild in self.guilds:
                 guild_client = self.guild_client(guild)
                 tasks.append(guild_client.get_neighbour_channel())
-                tasks.append(guild_client.get_neighbour_category())
                 tasks.append(guild_client.find_chats())
                 tasks.append(guild_client.delete_old_channels())
             asyncio.gather(*tasks)
@@ -81,24 +80,20 @@ class GuildClient(object):
         print(f'Added guild {guild.name}')
 
     async def get_neighbour_channel(self):
-        if self.neighbour_channel is None:
-            matches = [x for x in self.guild.channels if x.name == NEIGHBOUR_CHANNEL]
-            if len(matches) == 0:
-                # by default put the channel in the guild's first category
-                category = self.guild.categories[0]
-                self.neighbour_channel = await category.create_text_channel(NEIGHBOUR_CHANNEL, topic=NEIGHBOURBOT_TOPIC)
-            else:
-                self.neighbour_channel = matches[0]
-        return self.neighbour_channel
+        matches = [x for x in self.guild.channels if x.name == NEIGHBOUR_CHANNEL]
+        if len(matches) == 0:
+            # by default put the channel in the guild's first category
+            category = self.guild.categories[0]
+            return await category.create_text_channel(NEIGHBOUR_CHANNEL, topic=NEIGHBOURBOT_TOPIC)
+        else:
+            return matches[0]
 
     async def get_neighbour_category(self):
-        if self.neighbour_category is None:
-            matches = [x for x in self.guild.categories if x.name == NEIGHBOUR_CATEGORY]
-            if len(matches) == 0:
-                self.neighbour_category = await self.guild.create_category(NEIGHBOUR_CATEGORY)
-            else:
-                self.neighbour_category = matches[0]
-        return self.neighbour_category
+        matches = [x for x in self.guild.categories if x.name == NEIGHBOUR_CATEGORY]
+        if len(matches) == 0:
+            return await self.guild.create_category(NEIGHBOUR_CATEGORY)
+        else:
+            return matches[0]
 
     async def create_and_invite_voice_channel(self):
         category = await self.get_neighbour_category()
