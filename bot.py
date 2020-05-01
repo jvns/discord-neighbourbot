@@ -10,7 +10,7 @@ from unicodedata import lookup
 MATCH_SCRIPT="""
 {list_of_ids} are neighbours! Go chat in **#{channel_name}** {invite_link} !
 """
-CHECKMARK = lookup('BALLOT BOX WITH CHECK')
+CHECKMARK = '☑️'
 NEIGHBOUR_CATEGORY='Chat with neighbours!'
 NEIGHBOUR_CHANNEL='neighbourbot'
 
@@ -89,22 +89,20 @@ class GuildClient(object):
         return invite, channel_name
 
     async def delete_old_channels(self):
-        while True:
-            category = self.get_neighbour_category()
-            for channel in category.channels:
-                time_since_created = datetime.now(timezone.utc) - channel.created_at.replace(tzinfo=timezone.utc)
-                if time_since_created > timedelta(minutes=10) and len(channel.members) == 0:
-                    await channel.delete()
-            await asyncio.sleep(5)
+        category = self.get_neighbour_category()
+        for channel in category.channels:
+            time_since_created = datetime.now(timezone.utc) - channel.created_at.replace(tzinfo=timezone.utc)
+            if time_since_created > timedelta(minutes=10) and len(channel.members) == 0:
+                await channel.delete()
 
     async def find_chats(self):
-        while len(self.chats_requested) > 2:
+        while len(self.chats_requested) >= 2:
             group = sorted(list(self.chats_requested)[:3])
             for person in group:
                 self.chats_requested.remove(person)
             list_of_ids = ' and '.join([f'<@{x.id}>' for x in group])
             invite, channel_name = await self.create_and_invite_voice_channel()
-            message_1 = await self.get_neighbour_channel().send(MATCH_SCRIPT.format(list_of_ids = list_of_ids, channel_name=channel_name, invite_link=str(invite)))
+            await self.get_neighbour_channel().send(MATCH_SCRIPT.format(list_of_ids = list_of_ids, channel_name=channel_name, invite_link=str(invite)))
 
     async def request_chat(self, message):
         await message.add_reaction(CHECKMARK)
