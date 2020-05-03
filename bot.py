@@ -44,7 +44,7 @@ class MyClient(discord.Client):
                 tasks.append(guild_client.find_chats())
                 tasks.append(guild_client.delete_old_channels())
             asyncio.gather(*tasks)
-            await asyncio.sleep(2)
+            await asyncio.sleep(60)
 
     def guild_client(self, guild):
         if guild not in GUILDS:
