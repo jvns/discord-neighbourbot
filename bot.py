@@ -145,13 +145,13 @@ class GuildClient(object):
     async def start_match_group(self):
         neighbour_channel = await self.get_neighbour_channel()
         await neighbour_channel.send(":zap: we're matching people in :hourglass: **60 seconds**! say 'match me' to join!")
-        await asyncio.sleep(2)
+        await asyncio.sleep(15)
         await self.announce_impending_match(45)
-        await asyncio.sleep(2)
+        await asyncio.sleep(15)
         await self.announce_impending_match(30)
-        await asyncio.sleep(2)
+        await asyncio.sleep(15)
         await self.announce_impending_match(15)
-        await asyncio.sleep(2)
+        await asyncio.sleep(15)
         if len(self.chats_requested) > 1:
             await neighbour_channel.send(":sparkles::sparkles::sparkles:it's happening:sparkles::sparkles::sparkles:")
             await self.find_chats()
