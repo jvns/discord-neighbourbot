@@ -41,7 +41,6 @@ class MyClient(discord.Client):
             for guild in self.guilds:
                 guild_client = self.guild_client(guild)
                 tasks.append(guild_client.get_neighbour_channel())
-                tasks.append(guild_client.find_chats())
                 tasks.append(guild_client.delete_old_channels())
             asyncio.gather(*tasks)
             await asyncio.sleep(60)
@@ -57,6 +56,7 @@ class MyClient(discord.Client):
         await self.run_guild_tasks()
 
     async def on_message(self, message):
+        content = message.content.lower()
         if message.author == self.user:
             # ignore messages from the bot
             return
@@ -66,7 +66,7 @@ class MyClient(discord.Client):
         elif message.channel.name != NEIGHBOUR_CHANNEL:
             # ignore anything that isn't a DM
             return
-        elif message.content.lower().startswith('match me'):
+        elif 'match me' in content and '"match me"' not in content and "'match me'" not in content:
             await self.guild_client(message.guild).request_chat(message)
 
 
@@ -77,6 +77,7 @@ class GuildClient(object):
         self.chats_requested = set()
         self.neighbour_channel = None
         self.neighbour_category = None
+        self.match_in_progress = False
         print(f'Added guild {guild.name}')
 
     async def get_neighbour_channel(self):
@@ -125,6 +126,39 @@ class GuildClient(object):
     async def request_chat(self, message):
         await message.add_reaction(CHECKMARK)
         self.chats_requested.add(message.author)
+        if self.match_in_progress:
+            # just add them to the list and that's it
+            return
+        else:
+            self.match_in_progress = True
+            await self.start_match_group()
+            self.match_in_progress = False
+
+    async def announce_impending_match(self, seconds):
+        num_people = len(self.chats_requested)
+        neighbour_channel = await self.get_neighbour_channel()
+        if num_people == 1:
+            await neighbour_channel.send(f":hourglass: **{seconds} seconds!** we need more people, say 'match me' to join")
+        else:
+            await neighbour_channel.send(f":hourglass: **{seconds} seconds!** we have {num_people} people, say 'match me' to join")
+
+    async def start_match_group(self):
+        neighbour_channel = await self.get_neighbour_channel()
+        await neighbour_channel.send(":zap: we're matching people in :hourglass: **60 seconds**! say 'match me' to join!")
+        await asyncio.sleep(2)
+        await self.announce_impending_match(45)
+        await asyncio.sleep(2)
+        await self.announce_impending_match(30)
+        await asyncio.sleep(2)
+        await self.announce_impending_match(15)
+        await asyncio.sleep(2)
+        if len(self.chats_requested) > 1:
+            await neighbour_channel.send(":sparkles::sparkles::sparkles:it's happening:sparkles::sparkles::sparkles:")
+            await self.find_chats()
+        else:
+            self.chats_requested.clear()
+            await neighbour_channel.send("we need at least 2 people to match :frowning2: try again?")
+
 
 if __name__ == '__main__':
     client = MyClient()
