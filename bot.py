@@ -8,7 +8,7 @@ import asyncio
 from unicodedata import lookup
 
 MATCH_SCRIPT="""
-{list_of_ids} are neighbours! Go chat in **#{channel_name}** {invite_link} !
+I've matched you with {list_of_ids}! Go chat in **#{channel_name}** {invite_link} !
 """
 CHECKMARK = '☑️'
 NEIGHBOUR_CATEGORY='Chat with neighbours!'
@@ -118,10 +118,11 @@ class GuildClient(object):
                 group = list(self.chats_requested)[:3]
             for person in group:
                 self.chats_requested.remove(person)
-            list_of_ids = ' and '.join([f'<@{x.id}>' for x in group])
             invite, channel_name = await self.create_and_invite_voice_channel()
             neighbour_channel = await self.get_neighbour_channel()
-            await neighbour_channel.send(MATCH_SCRIPT.format(list_of_ids = list_of_ids, channel_name=channel_name, invite_link=str(invite)))
+            for person in group:
+                list_of_ids = ' and '.join([f'@{x.name}' for x in group if x != person])
+                await person.send(MATCH_SCRIPT.format(list_of_ids = list_of_ids, channel_name=channel_name, invite_link=str(invite)))
 
     async def request_chat(self, message):
         await message.add_reaction(CHECKMARK)
@@ -153,7 +154,7 @@ class GuildClient(object):
         await self.announce_impending_match(15)
         await asyncio.sleep(15)
         if len(self.chats_requested) > 1:
-            await neighbour_channel.send(":sparkles::sparkles::sparkles:it's happening:sparkles::sparkles::sparkles:")
+            await neighbour_channel.send(":sparkles::sparkles::sparkles:it's happening:sparkles::sparkles::sparkles: I sent everyone a DM!")
             await self.find_chats()
         else:
             self.chats_requested.clear()
