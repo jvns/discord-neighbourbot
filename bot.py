@@ -111,6 +111,7 @@ class GuildClient(object):
                 await channel.delete()
 
     async def find_chats(self):
+        all_people = self.chats_requested.copy()
         while len(self.chats_requested) >= 2:
             if len(self.chats_requested) == 4:
                 group = list(self.chats_requested)[:2]
@@ -123,6 +124,10 @@ class GuildClient(object):
             for person in group:
                 list_of_ids = ' and '.join([f'@{x.name}' for x in group if x != person])
                 await person.send(MATCH_SCRIPT.format(list_of_ids = list_of_ids, channel_name=channel_name, invite_link=str(invite)))
+        await asyncio.sleep(300)
+        for person in all_people:
+                await person.send("It's been 5 minutes since your group started! This is your official socially acceptable time to leave, or you can keep chatting! Type 'match me' again in #neighbourbot to get another group.")
+
 
     async def request_chat(self, message):
         await message.add_reaction(CHECKMARK)
