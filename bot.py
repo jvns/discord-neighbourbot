@@ -110,8 +110,19 @@ class GuildClient(object):
             if time_since_created > timedelta(minutes=10) and len(channel.members) == 0:
                 await channel.delete()
 
+    async def send_intro(self, intros, person, other_person):
+        if intros is None:
+            # there's no #introductions channel, give up
+            return
+        intro = intros.get(other_person, None)
+        if intro is None:
+            # we don't have an intro for that person
+            return
+        await person.send(f"@{other_person.name}, from #introductions: \"{intro}\"")
+
     async def find_chats(self):
         all_people = self.chats_requested.copy()
+        intros = await self.get_introductions()
         while len(self.chats_requested) >= 2:
             if len(self.chats_requested) == 4:
                 group = list(self.chats_requested)[:2]
@@ -122,12 +133,26 @@ class GuildClient(object):
             invite, channel_name = await self.create_and_invite_voice_channel()
             neighbour_channel = await self.get_neighbour_channel()
             for person in group:
-                list_of_ids = ' and '.join([f'@{x.name}' for x in group if x != person])
+                other_people = [x for x in group if x != person]
+                list_of_ids = ' and '.join([f'@{x.name}' for x in other_people])
                 await person.send(MATCH_SCRIPT.format(list_of_ids = list_of_ids, channel_name=channel_name, invite_link=str(invite)))
+                for other_person in other_people:
+                    await self.send_intro(intros, person, other_person)
+
         await asyncio.sleep(300)
         for person in all_people:
-                await person.send("It's been 5 minutes since your group started! This is your official socially acceptable time to leave, or you can keep chatting! Type 'match me' again in #neighbourbot to get another group.")
+            await person.send("It's been 5 minutes since your group started! This is your official socially acceptable time to leave :rocket:, or you can keep chatting! Type 'match me' again in #neighbourbot to start again.")
 
+
+    async def get_introductions(self):
+        matches = [x for x in self.guild.channels if x.name == 'introductions']
+        if len(matches) == 0:
+            return
+        intros = {}
+        channel = matches[0]
+        async for message in channel.history():
+            intros[message.author] = message.content
+        return intros
 
     async def request_chat(self, message):
         await message.add_reaction(CHECKMARK)
