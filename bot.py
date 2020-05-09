@@ -139,6 +139,7 @@ class GuildClient(object):
                 for other_person in other_people:
                     await self.send_intro(intros, person, other_person)
 
+        self.match_in_progress = False
         await asyncio.sleep(300)
         for person in all_people:
             await person.send("It's been 5 minutes since your group started! This is your official socially acceptable time to leave :rocket:, or you can keep chatting! Type 'match me' again in #neighbourbot to start again.")
@@ -163,7 +164,6 @@ class GuildClient(object):
         else:
             self.match_in_progress = True
             await self.start_match_group()
-            self.match_in_progress = False
 
     async def announce_impending_match(self, seconds):
         num_people = len(self.chats_requested)
