@@ -175,10 +175,10 @@ class GuildClient(object):
 
     async def start_match_group(self):
         neighbour_channel = await self.get_neighbour_channel()
-        await neighbour_channel.send(":zap: we're matching people in :hourglass: **60 seconds**! say 'match me' to join!")
-        await asyncio.sleep(15)
-        await self.announce_impending_match(45)
-        await asyncio.sleep(15)
+        await neighbour_channel.send(":zap: we're matching people in :hourglass: **90 seconds**! say 'match me' to join!")
+        await asyncio.sleep(30)
+        await self.announce_impending_match(60)
+        await asyncio.sleep(30)
         await self.announce_impending_match(30)
         await asyncio.sleep(15)
         await self.announce_impending_match(15)
