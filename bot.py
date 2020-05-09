@@ -187,6 +187,7 @@ class GuildClient(object):
             await neighbour_channel.send(":sparkles::sparkles::sparkles:it's happening:sparkles::sparkles::sparkles: I sent everyone a DM!")
             await self.find_chats()
         else:
+            self.match_in_progress = False
             self.chats_requested.clear()
             await neighbour_channel.send("we need at least 2 people to match :frowning2: try again?")
 
